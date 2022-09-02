@@ -134,67 +134,49 @@ async function render(viewer,index){
         // const pinBuilder = new Cesium.PinBuilder();
         // image = pinBuilder.fromText(feature.properties.point_count_abbreviated, Cesium.Color.BLUE, 48).toDataURL();
         image = fillText(feature.properties.point_count_abbreviated)
-        // console.log(image);
         width = 45;
         height = 45;
         verticalOrigin = Cesium.VerticalOrigin.BOTTOM;
-        image.onload = function(){
-
-          billboardCollection.add({
-            position: Cesium.Cartesian3.fromDegrees(feature.geometry.coordinates[0], feature.geometry.coordinates[1], 0),
-            id: feature.properties,
-            image: image,
-            imageId: feature.properties.point_count_abbreviated,
-            horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-            verticalOrigin,
-            width,
-            height,
-          })
-        }
       }else{
         image = getIcon(feature.properties);
         width = 32;
         height = 32;
         verticalOrigin = Cesium.VerticalOrigin.CENTER;
-
-        
-        image.onload = function(){
-        billboardCollection.add({
-          position: Cesium.Cartesian3.fromDegrees(feature.geometry.coordinates[0], feature.geometry.coordinates[1], 0),
-          id: feature.properties,
-          image: image,
-          // imageId: image,
-          horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-          verticalOrigin,
-          width,
-          height,
-        })
-        }
       }
+      billboardCollection.add({
+        position: Cesium.Cartesian3.fromDegrees(feature.geometry.coordinates[0], feature.geometry.coordinates[1], 0),
+        id: feature.properties,
+        image: image,
+        imageId: feature.properties.point_count_abbreviated || image,
+        horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+        verticalOrigin,
+        width,
+        height,
+      })
     })
   }
 }
 
 function getIcon({isStatus,onlineStatus,productImg}, select){
-  let img = null 
+  let imgUrl = null 
   const deviceSelectIcon = productImg.jscImgSelected;
   if(isStatus==1){ // 无权限
     if(onlineStatus==1){ // 正常
-      img = select ? deviceSelectIcon : productImg.jscImgNo;
+      imgUrl = select ? deviceSelectIcon : productImg.jscImgNo;
     }else{ // 故障
-      img = select ? deviceSelectIcon : productImg.jscImgFaultNo;
+      imgUrl = select ? deviceSelectIcon : productImg.jscImgFaultNo;
     }
   }else if(isStatus==2){ // 有权限
     if(onlineStatus==1){ // 正常
-      img = select ? deviceSelectIcon : productImg.jscImgHave;
+      imgUrl = select ? deviceSelectIcon : productImg.jscImgHave;
     }else{ // 故障
-      img = select ? deviceSelectIcon : productImg.jscImgFaultHave;
+      imgUrl = select ? deviceSelectIcon : productImg.jscImgFaultHave;
     }
   }
   const Img = new Image()
   Img.setAttribute('crossOrigin', 'Anonymous')
-  Img.src = img; // 转换图片为dataURL
-  return Img
+  Img.src = imgUrl; // 转换图片为dataURL
+  return imgUrl
 };
 
 // 圆圈模型红色多线圈
@@ -251,11 +233,11 @@ function createCanvas(url) {
         // ctx.restore();
         // ctx.closePath();
         const Img2 = new Image()
-        Img2.setAttribute('crossOrigin', 'Anonymous')
-        Img2.width = width;
-        Img2.height = height;
+        // Img2.setAttribute('crossOrigin', 'Anonymous')
+        // Img2.width = width;
+        // Img2.height = height;
         Img2.src = canvas.toDataURL('image/png') // 转换图片为dataURL
-        return Img2;
+        return canvas.toDataURL('image/png');
       })
     }
   })
