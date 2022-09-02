@@ -6,6 +6,10 @@
 import * as Cesium from 'cesium';
 // import Viewer from 'cesium/Source/Widgets/Viewer/Viewer';
 import "cesium/Build/Cesium/Widgets/widgets.css";
+import _ from 'lodash';
+
+import partyMemberIcon from './社区打点.png'; 
+import partyMemberSelectIcon from './社区打点-选中.png'; 
 
 import { initCluster, renderCluster, getPointsByClusterId } from './SuperClusterUtils';
 import { specialEffects } from './CircleWaveMaterialProperty'
@@ -35,25 +39,26 @@ onMounted(() => {
   // viewer.dataSources.add(dataSource);
 
   let index;
+
   // fetch('/places.json').then(res=>{
   //   return res.json();
   // }).then(async geojson=>{
   //   index = await initCluster(geojson.features);
   //   // console.log(index.getTile(0, 0, 0));
-  //   render(viewer,customDataSource,index)
+  //   render(viewer,index)
   // })
   fetch(
     'http://10.40.127.45:8081/device/selectByCellName',{
       method: 'POST',
       headers: {
-        'Authorization': 'Bearer 3709fcea-9d15-413d-8940-552f3984ed90',
+        // 'Authorization': 'Bearer 3709fcea-9d15-413d-8940-552f3984ed90',
         'Content-Type': 'application/json;charset=UTF-8',
       },
       body:JSON.stringify({productId:[]})
     }).then(res=>{
     return res.json();
   }).then(async res=>{
-    // console.log(res);
+    console.log(res);
     const features =  res.data.deviceList.map(item=>{
       return{
         type: "Feature",
@@ -72,8 +77,8 @@ onMounted(() => {
     })
   })
   
-  viewer.camera.changed.addEventListener(() =>{
-    setTimeout(()=>{
+  viewer.camera.changed.addEventListener(
+    _.debounce(function () {
       render(viewer,index);
       if(EllipseModel){
         const height = Math.ceil(viewer.camera.positionCartographic.height)
@@ -81,8 +86,8 @@ onMounted(() => {
         EllipseModel.ellipse.semiMajorAxis = height * 0.05;
         console.log(EllipseModel);
       }
-    })
-  },);
+    }, 200),
+  );
   viewer.screenSpaceEventHandler.setInputAction(async (movement) =>{
     // let pickedFeatures = viewer.scene.drillPick(movement.position);
     // console.log('选中位置',movement.position);
@@ -121,49 +126,75 @@ async function render(viewer,index){
       );
     }
     
-
-    features.map(feature=>{
+    const fillText = await createCanvas(partyMemberIcon);
+    // console.log(partyMemberIcon);
+    features.map(async feature=>{
       let image,width,height,verticalOrigin;
       if(feature.properties.cluster){
-        const pinBuilder = new Cesium.PinBuilder();
-        image = pinBuilder.fromText(feature.properties.point_count_abbreviated, Cesium.Color.BLUE, 48).toDataURL();
+        // const pinBuilder = new Cesium.PinBuilder();
+        // image = pinBuilder.fromText(feature.properties.point_count_abbreviated, Cesium.Color.BLUE, 48).toDataURL();
+        image = fillText(feature.properties.point_count_abbreviated)
+        // console.log(image);
         width = 45;
         height = 45;
         verticalOrigin = Cesium.VerticalOrigin.BOTTOM;
+        image.onload = function(){
+
+          billboardCollection.add({
+            position: Cesium.Cartesian3.fromDegrees(feature.geometry.coordinates[0], feature.geometry.coordinates[1], 0),
+            id: feature.properties,
+            image: image,
+            imageId: feature.properties.point_count_abbreviated,
+            horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+            verticalOrigin,
+            width,
+            height,
+          })
+        }
       }else{
         image = getIcon(feature.properties);
         width = 32;
         height = 32;
         verticalOrigin = Cesium.VerticalOrigin.CENTER;
+
+        
+        image.onload = function(){
+        billboardCollection.add({
+          position: Cesium.Cartesian3.fromDegrees(feature.geometry.coordinates[0], feature.geometry.coordinates[1], 0),
+          id: feature.properties,
+          image: image,
+          // imageId: image,
+          horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+          verticalOrigin,
+          width,
+          height,
+        })
+        }
       }
-      billboardCollection.add({
-        position: Cesium.Cartesian3.fromDegrees(feature.geometry.coordinates[0], feature.geometry.coordinates[1], 0),
-        id: feature.properties,
-        image: image,
-        horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-        verticalOrigin,
-        width,
-        height,
-      })
     })
   }
 }
 
 function getIcon({isStatus,onlineStatus,productImg}, select){
+  let img = null 
   const deviceSelectIcon = productImg.jscImgSelected;
-    if(isStatus==1){ // 无权限
-      if(onlineStatus==1){ // 正常
-        return select ? deviceSelectIcon : productImg.jscImgNo;
-      }else{ // 故障
-        return select ? deviceSelectIcon : productImg.jscImgFaultNo;
-      }
-    }else if(isStatus==2){ // 有权限
-      if(onlineStatus==1){ // 正常
-        return select ? deviceSelectIcon : productImg.jscImgHave;
-      }else{ // 故障
-        return select ? deviceSelectIcon : productImg.jscImgFaultHave;
-      }
+  if(isStatus==1){ // 无权限
+    if(onlineStatus==1){ // 正常
+      img = select ? deviceSelectIcon : productImg.jscImgNo;
+    }else{ // 故障
+      img = select ? deviceSelectIcon : productImg.jscImgFaultNo;
     }
+  }else if(isStatus==2){ // 有权限
+    if(onlineStatus==1){ // 正常
+      img = select ? deviceSelectIcon : productImg.jscImgHave;
+    }else{ // 故障
+      img = select ? deviceSelectIcon : productImg.jscImgFaultHave;
+    }
+  }
+  const Img = new Image()
+  Img.setAttribute('crossOrigin', 'Anonymous')
+  Img.src = img; // 转换图片为dataURL
+  return Img
 };
 
 // 圆圈模型红色多线圈
@@ -182,9 +213,58 @@ function getEllipseModel2 (viewer,longitude, latitude) {
   })
 }
 
+function createCanvas(url) {
+  return new Promise((resolve, reject) => { //同步
+    const Img = new Image()
+    // let dataURL = ''
+    Img.setAttribute('crossOrigin', 'Anonymous')
+    Img.src = url
+    Img.onload = function() {
+      // 要先确保图片完整获取到，这是个异步事件
+      const canvas = document.createElement('canvas') // 创建canvas元素
+      // 确保canvas的尺寸和图片一样
+      const width = Img.width 
+      const height = Img.height
+
+      canvas.width = width
+      canvas.height = height
+
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = "red";  // 填充颜色为红色
+
+      // ctx.strokeStyle = "blue";  // 画笔的颜色
+      // ctx.lineWidth = 5;  // 指定描边线的宽度
+
+      // ctx.beginPath();
+
+      ctx.font=`bold ${width/2}px Arial`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.save(); // 保存当前环境的状态。
+      // ctx.fillText(text,width/2,height/2);
+      // dataURL = 
+      resolve(function fillText(text ){
+        ctx.clearRect(0, 0, width, height);
+        // 将图片绘制到canvas中
+        ctx.drawImage(Img, 0, 0, width, height);
+        text && ctx.fillText(text,width/2,height/2);
+        // ctx.restore();
+        // ctx.closePath();
+        const Img2 = new Image()
+        Img2.setAttribute('crossOrigin', 'Anonymous')
+        Img2.width = width;
+        Img2.height = height;
+        Img2.src = canvas.toDataURL('image/png') // 转换图片为dataURL
+        return Img2;
+      })
+    }
+  })
+}
+
 function createViewer(id) {
   const viewer = new Cesium.Viewer(id, {
     // terrainProvider: Cesium.createWorldTerrain()
+    infoBox: false,
   });
 
   viewer.scene.debugShowFramesPerSecond = true;
