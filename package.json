@@ -10,6 +10,7 @@
   "dependencies": {
     "cesium": "^1.95.0",
     "cesium-tdt": "^1.1.0",
+    "libgif": "^0.0.3",
     "lodash": "^4.17.21",
     "sass": "^1.53.0",
     "supercluster": "^7.1.5",
